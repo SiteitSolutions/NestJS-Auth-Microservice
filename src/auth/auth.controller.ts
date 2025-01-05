@@ -15,6 +15,9 @@ import { CreateUserDto } from 'src/users/dto/create-user.dto';
 import { Request, Response } from 'express';
 import { UserEntity } from 'src/users/entities/user.entity';
 import { plainToInstance } from 'class-transformer';
+import { Roles } from './decorators/role.decorator';
+import { UserRole } from 'src/users/enums/enums';
+import { RolesGuard } from './guards/roles.guard';
 
 @Controller('auth')
 export class AuthController {
@@ -62,7 +65,8 @@ export class AuthController {
     return { message: 'Logged out successfully' };
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(UserRole.USER)
   @Get('profile')
   async getProfile(@Req() req) {
     return req.user;
