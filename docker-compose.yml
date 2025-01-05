@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile  # Path to your Dockerfile
+    container_name: nestjs-app
+    ports:
+      - "3000:3000"  # Expose port 3000 for the app
+    environment:
+      MONGO_URI: mongodb://root:password@mongodb:27017/nestdb  # MongoDB connection string
+    depends_on:
+      - mongodb  # Ensures MongoDB starts before the app service
+
+  mongodb:
+    image: mongo:6.0  # MongoDB image
+    container_name: nestjs-mongodb
+    ports:
+      - "27017:27017"  # MongoDB port
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: password
+      MONGO_INITDB_DATABASE: nestdb
+    volumes:
+      - mongo-data:/data/db  # Persistent storage for MongoDB data
+      - mongo-config:/data/configdb
+
+volumes:
+  mongo-data:
+  mongo-config:
