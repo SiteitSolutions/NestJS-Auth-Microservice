@@ -9,7 +9,7 @@ services:
     ports:
       - "3000:3000"  # Expose port 3000 for the app
     environment:
-      MONGO_URI: mongodb://root:password@mongodb:27017/nestdb  # MongoDB connection string
+      MONGO_URI: mongodb://root:password@mongodb:27017/nestdb?authSource=admin  # MongoDB connection string
     depends_on:
       - mongodb  # Ensures MongoDB starts before the app service
 
