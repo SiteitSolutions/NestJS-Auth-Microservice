@@ -4,7 +4,12 @@ import { v4 as uuidv4 } from 'uuid';
 import * as bcrypt from 'bcryptjs';
 import { Gender, UserRole } from '../enums/enums';
 
-export type UserDocument = HydratedDocument<User>;
+export type UserDocument = HydratedDocument<User & UserMethods>;
+
+type UserMethods = {
+  comparePassword(plaintextPassword: string): Promise<boolean>;
+  hashPassword(): Promise<void>;
+};
 
 @Schema({ timestamps: true })
 export class User {
@@ -55,23 +60,25 @@ export class User {
 
   @Prop()
   profilePictureUrl?: string; // URL to profile picture
-
-  async hashPassword(): Promise<void> {
-    const salt = await bcrypt.genSalt(12);
-    this.password = await bcrypt.hash(this.password, salt);
-  }
-
-  async comparePassword(plaintextPassword: string): Promise<boolean> {
-    return bcrypt.compare(plaintextPassword, this.password);
-  }
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
 
+UserSchema.methods.comparePassword = async function (
+  plaintextPassword: string,
+): Promise<boolean> {
+  return bcrypt.compare(plaintextPassword, this.password);
+};
+
+UserSchema.methods.hashPassword = async function (): Promise<void> {
+  const salt = await bcrypt.genSalt(12);
+  this.password = await bcrypt.hash(this.password, salt);
+};
+
 // Middleware to hash password before save
 UserSchema.pre<UserDocument>('save', async function (next) {
   if (this.isModified('password')) {
-    await this.hashPassword();
+    this.hashPassword();
   }
   next();
 });
