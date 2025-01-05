@@ -7,8 +7,8 @@ import { Gender, UserRole } from '../enums/enums';
 export type UserDocument = HydratedDocument<User & UserMethods>;
 
 type UserMethods = {
-  comparePassword(plaintextPassword: string): Promise<boolean>;
-  hashPassword(): Promise<void>;
+  comparePassword(plaintextPassword: string): boolean;
+  hashPassword(): void;
 };
 
 @Schema({ timestamps: true })
@@ -49,11 +49,11 @@ export class User {
   birthDate?: Date; // Optional birth date
 
   @Prop({
-    type: String,
+    type: [String],
     enum: UserRole,
-    default: UserRole.USER,
+    default: [UserRole.USER],
   })
-  role: string; // Role for access control
+  role: string[]; // Role for access control
 
   @Prop({ default: true })
   isActive: boolean; // Can be used for account activation status
@@ -64,21 +64,28 @@ export class User {
 
 export const UserSchema = SchemaFactory.createForClass(User);
 
-UserSchema.methods.comparePassword = async function (
+UserSchema.methods.comparePassword = function (
   plaintextPassword: string,
-): Promise<boolean> {
-  return bcrypt.compare(plaintextPassword, this.password);
-};
-
-UserSchema.methods.hashPassword = async function (): Promise<void> {
-  const salt = await bcrypt.genSalt(12);
-  this.password = await bcrypt.hash(this.password, salt);
+): boolean {
+  return bcrypt.compareSync(plaintextPassword, this.password);
 };
 
 // Middleware to hash password before save
 UserSchema.pre<UserDocument>('save', async function (next) {
   if (this.isModified('password')) {
-    this.hashPassword();
+    const salt = await bcrypt.genSalt(12);
+    this.password = await bcrypt.hash(this.password, salt);
+  }
+  next();
+});
+
+// Middleware to hash password before update
+UserSchema.pre('findOneAndUpdate', async function (next) {
+  const update = this.getUpdate() as User;
+  if (update?.password) {
+    const salt = await bcrypt.genSalt(12);
+    update.password = await bcrypt.hash(update.password, salt);
+    this.setUpdate(update);
   }
   next();
 });

@@ -4,6 +4,7 @@ import {
   IsOptional,
   IsEnum,
   MinLength,
+  IsArray,
 } from 'class-validator';
 import { UserRole, Gender } from '../enums/enums';
 
@@ -35,8 +36,12 @@ export class CreateUserDto {
   birthDate?: Date; // Birth date of the user (optional)
 
   @IsOptional()
-  @IsEnum(UserRole, { message: 'Role must be user, admin, or moderator.' })
-  role?: UserRole; // User role (optional, default: 'user')
+  @IsArray()
+  @IsEnum(UserRole, {
+    each: true,
+    message: 'Each role must be one of user, admin, or moderator.',
+  })
+  role?: UserRole[]; // Array of user roles (optional, default: ['user'])
 
   @IsOptional()
   @IsString()

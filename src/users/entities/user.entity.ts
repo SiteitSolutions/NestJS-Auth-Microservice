@@ -13,7 +13,7 @@ export class UserEntity {
   middleName?: string;
   gender?: Gender;
   birthDate?: Date;
-  role: UserRole;
+  role: UserRole[];
   isActive: boolean;
   profilePictureUrl?: string;
 
