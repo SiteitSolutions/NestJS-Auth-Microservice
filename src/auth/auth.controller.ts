@@ -41,7 +41,17 @@ export class AuthController {
 
   @UseGuards(JwtAuthGuard)
   @Post('logout')
-  async logout(@Res({ passthrough: true }) response: Response) {
+  async logout(
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const authHeader = request.headers.authorization;
+    const accessToken = authHeader?.split(' ')[1]; // Extract access token
+
+    if (accessToken) {
+      await this.authService.invalidateAccessToken(accessToken); // Blacklist the access token
+    }
+
     // Clear the refresh token cookie
     response.clearCookie('refreshToken', {
       httpOnly: true,

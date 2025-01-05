@@ -16,7 +16,7 @@ export class UsersService {
       const existingUser = await this.findOne({ email: userDto.email });
 
       if (existingUser) {
-        throw new Error('A user with that email already exists.');
+        throw new BadRequestException('A user with that email already exists.');
       }
 
       const user = new this.userModel(userDto);
@@ -44,7 +44,7 @@ export class UsersService {
       );
 
       if (!updatedUser) {
-        throw new Error('Unable to find and update user.');
+        throw new BadRequestException('Unable to find and update user.');
       }
 
       return plainToInstance(UserEntity, updatedUser.toObject());

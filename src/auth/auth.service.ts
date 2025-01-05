@@ -1,7 +1,8 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { Cache } from 'cache-manager';
 import { plainToClass, plainToInstance } from 'class-transformer';
-import e from 'express';
 import { CreateUserDto } from 'src/users/dto/create-user.dto';
 import { UserEntity } from 'src/users/entities/user.entity';
 import { UsersService } from 'src/users/users.service';
@@ -11,6 +12,7 @@ export class AuthService {
   constructor(
     private usersService: UsersService,
     private jwtService: JwtService,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
   // Generate Access and Refresh Tokens
@@ -75,5 +77,17 @@ export class AuthService {
     }
 
     return null;
+  }
+
+  // Blacklist access token
+  async invalidateAccessToken(token: string): Promise<void> {
+    const expiresIn = parseInt(process.env.REDIS_TTL ?? '900_000'); // 15 minutes in seconds
+    await this.cacheManager.set(`blacklisted:${token}`, true, expiresIn);
+  }
+
+  // Check if access token is blacklisted
+  async isAccessTokenBlacklisted(token: string): Promise<boolean> {
+    const result = await this.cacheManager.get(`blacklisted:${token}`);
+    return result === true;
   }
 }

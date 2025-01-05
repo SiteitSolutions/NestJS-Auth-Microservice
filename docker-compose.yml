@@ -10,8 +10,14 @@ services:
       - "3000:3000"  # Expose port 3000 for the app
     environment:
       MONGO_URI: mongodb://root:password@mongodb:27017/nestdb?authSource=admin  # MongoDB connection string
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_TTL: 900_000  # 15 minutes in milliseconds
+      JWT_SECRET: "ZgcI4otHHeQAC1Pf4Ijsb/hcluGoCe13WcK8LHiBFCUkpyekQYQFijKVgbvJud7LvZFPw4Be3X/TSTjjPaNiUObCC0hWGgke"
+      REFRESH_TOKEN_SECRET: "XcziglfyenMyDS66VTb3qXzH2YSpsC/x7YABh4UVYeyrGpvJlwf3mERCEw2N5DM+5WvFoLMEiHkRNCcD5lNJpRdChTBENWkz"
     depends_on:
       - mongodb  # Ensures MongoDB starts before the app service
+      - redis  # Ensures Redis starts before the app service
 
   mongodb:
     image: mongo:6.0  # MongoDB image
@@ -25,7 +31,17 @@ services:
     volumes:
       - mongo-data:/data/db  # Persistent storage for MongoDB data
       - mongo-config:/data/configdb
+  
+  redis:
+    image: redis:latest
+    container_name: nestjs-redis
+    ports:
+      - "6379:6379"  # Expose Redis default port
+    command: ["redis-server", "--save", "", "--appendonly", "no"]  # Disable persistence for dev
+    volumes:
+      - redis-data:/data
 
 volumes:
   mongo-data:
   mongo-config:
+  redis-data:
