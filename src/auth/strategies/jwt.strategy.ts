@@ -10,7 +10,16 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: process.env.JWT_SECRET,
+      secretOrKeyProvider: async (request, token, done) => {
+        if (await this.authService.isAccessTokenBlacklisted(token)) {
+          return done(
+            new UnauthorizedException('Access token has been invalidated.'),
+            null,
+          );
+        }
+
+        return done(null, process.env.JWT_SECRET);
+      },
     });
   }
 

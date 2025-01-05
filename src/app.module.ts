@@ -7,6 +7,7 @@ import { UsersModule } from './users/users.module';
 import { AuthModule } from './auth/auth.module';
 import { CacheModule, CacheStore } from '@nestjs/cache-manager';
 import { redisStore } from 'cache-manager-redis-yet';
+import { JwtModule } from '@nestjs/jwt';
 
 @Module({
   imports: [
@@ -28,6 +29,7 @@ import { redisStore } from 'cache-manager-redis-yet';
       },
       isGlobal: true,
     }),
+    JwtModule.register({ global: true }),
     UsersModule,
     AuthModule,
   ],

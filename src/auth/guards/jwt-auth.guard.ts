@@ -6,14 +6,10 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { AuthGuard } from '@nestjs/passport';
 import { Request } from 'express';
-import { AuthService } from '../auth.service';
 
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
-  constructor(
-    private jwtService: JwtService,
-    private readonly authService: AuthService,
-  ) {
+  constructor(private readonly jwtService: JwtService) {
     super();
   }
 
@@ -26,10 +22,6 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
       throw new UnauthorizedException('No access token provided');
     }
 
-    if (await this.authService.isAccessTokenBlacklisted(token)) {
-      throw new UnauthorizedException('Access token has been invalidated.');
-    }
-
     try {
       const payload = this.jwtService.verify(token, {
         secret: process.env.JWT_SECRET,
@@ -40,7 +32,8 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
       } else {
         throw new UnauthorizedException('Invalid or expired access token');
       }
-    } catch {
+    } catch (error) {
+      console.error(error);
       throw new UnauthorizedException('Invalid or expired access token');
     }
   }
