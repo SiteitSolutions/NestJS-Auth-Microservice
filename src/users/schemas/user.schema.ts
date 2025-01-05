@@ -53,7 +53,7 @@ export class User {
     enum: UserRole,
     default: [UserRole.USER],
   })
-  role: string[]; // Role for access control
+  roles: string[]; // Role for access control
 
   @Prop({ default: true })
   isActive: boolean; // Can be used for account activation status

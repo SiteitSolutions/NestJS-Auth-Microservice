@@ -41,7 +41,7 @@ export class CreateUserDto {
     each: true,
     message: 'Each role must be one of user, admin, or moderator.',
   })
-  role?: UserRole[]; // Array of user roles (optional, default: ['user'])
+  roles?: UserRole[]; // Array of user roles (optional, default: ['user'])
 
   @IsOptional()
   @IsString()
