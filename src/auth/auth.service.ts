@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { plainToClass, plainToInstance } from 'class-transformer';
 import e from 'express';
@@ -12,6 +12,37 @@ export class AuthService {
     private usersService: UsersService,
     private jwtService: JwtService,
   ) {}
+
+  // Generate Access and Refresh Tokens
+  async generateTokens(
+    payload: any,
+  ): Promise<{ accessToken: string; refreshToken: string }> {
+    const accessToken = this.jwtService.sign(payload, {
+      secret: process.env.JWT_SECRET,
+      expiresIn: '30m', // Short-lived access token (30 minutes)
+    });
+
+    const refreshToken = this.jwtService.sign(payload, {
+      secret: process.env.REFRESH_TOKEN_SECRET,
+      expiresIn: '7d', // Long-lived refresh token (7 days)
+    });
+
+    return { accessToken, refreshToken };
+  }
+
+  // Verify Refresh Token
+  async verifyRefreshToken(
+    token: string,
+  ): Promise<{ _id: string; email: string }> {
+    try {
+      const payload = this.jwtService.verify(token, {
+        secret: process.env.REFRESH_TOKEN_SECRET,
+      });
+      return payload;
+    } catch {
+      throw new UnauthorizedException('Invalid or expired refresh token');
+    }
+  }
 
   async validateUser(email: string, pass: string): Promise<UserEntity | null> {
     const userDocument = await this.usersService.findOne({ email });
@@ -34,15 +65,6 @@ export class AuthService {
     }
 
     return null;
-  }
-
-  async login(user: UserEntity): Promise<{ access_token: string }> {
-    return {
-      access_token: this.jwtService.sign(
-        { _id: user._id, email: user.email },
-        { expiresIn: '1d' },
-      ),
-    };
   }
 
   async register(body: CreateUserDto): Promise<UserEntity | null> {

@@ -10,7 +10,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: 'secret',
+      secretOrKey: process.env.JWT_SECRET,
     });
   }
 
@@ -18,7 +18,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     const user = await this.authService.validateJwt(payload);
 
     if (!user) {
-      throw new UnauthorizedException();
+      throw new UnauthorizedException('Invalid or expired token');
     }
 
     return user;
