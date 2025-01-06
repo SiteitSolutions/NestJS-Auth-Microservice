@@ -73,7 +73,7 @@ export class AuthService {
     const userDocument = await this.usersService.create(body);
 
     if (userDocument) {
-      return plainToClass(UserEntity, userDocument.toObject());
+      return plainToInstance(UserEntity, userDocument.toObject());
     }
 
     return null;
