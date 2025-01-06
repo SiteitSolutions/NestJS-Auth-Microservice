@@ -54,6 +54,27 @@ export class UsersService {
     }
   }
 
+  async remove(id: string): Promise<UserEntity | null> {
+    try {
+      const deletedUser = await this.userModel.findByIdAndUpdate(
+        id,
+        {
+          deletedAt: new Date(),
+        },
+        { new: true },
+      );
+
+      if (!deletedUser) {
+        throw new BadRequestException('Unable to find and delete user.');
+      }
+
+      return plainToInstance(UserEntity, deletedUser.toObject());
+    } catch (error) {
+      console.error(error);
+      throw new BadRequestException(error.message);
+    }
+  }
+
   findOne(filter: object): Promise<UserDocument | undefined> {
     try {
       return this.userModel.findOne(filter);

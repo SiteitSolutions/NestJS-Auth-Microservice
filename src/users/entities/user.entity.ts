@@ -36,6 +36,15 @@ export class UserEntity {
   @ApiResponseProperty()
   profilePictureUrl?: string;
 
+  @ApiResponseProperty()
+  deletedAt: Date | null;
+
+  @ApiResponseProperty()
+  createdAt: Date;
+
+  @ApiResponseProperty()
+  updatedAt: Date;
+
   constructor(partial: Partial<UserEntity>) {
     Object.assign(this, partial); // Populate the class instance with the object properties
   }

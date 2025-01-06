@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { HydratedDocument } from 'mongoose';
+import { HydratedDocument, Query } from 'mongoose';
 import { v4 as uuidv4 } from 'uuid';
 import * as bcrypt from 'bcryptjs';
 import { Gender, UserRole } from '../enums/enums';
@@ -60,6 +60,9 @@ export class User {
 
   @Prop()
   profilePictureUrl?: string; // URL to profile picture
+
+  @Prop({ type: Date, default: null })
+  deletedAt: Date | null; // Soft delete timestamp
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);
@@ -86,6 +89,19 @@ UserSchema.pre('findOneAndUpdate', async function (next) {
     const salt = await bcrypt.genSalt(12);
     update.password = await bcrypt.hash(update.password, salt);
     this.setUpdate(update);
+  }
+  next();
+});
+
+// Add a query middleware to automatically filter out soft-deleted users
+UserSchema.pre<Query<UserDocument, UserDocument>>(/^find/, function (next) {
+  const filter = this.getQuery();
+  if (!filter.includeDeleted) {
+    this.setQuery({ ...filter, deletedAt: null });
+  } else {
+    // Remove the includeDeleted flag from the query
+    delete filter.includeDeleted;
+    this.setQuery({ ...filter });
   }
   next();
 });
