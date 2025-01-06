@@ -20,7 +20,7 @@ services:
       - redis  # Ensures Redis starts before the app service
 
   mongodb:
-    image: mongo:4.4  # MongoDB image
+    image: mongo:6.0 # MongoDB image
     container_name: nestjs-mongodb
     ports:
       - "27017:27017"  # MongoDB port

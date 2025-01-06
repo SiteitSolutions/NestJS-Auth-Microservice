@@ -5,7 +5,6 @@ import {
   Get,
   Post,
   Req,
-  Res,
   UnauthorizedException,
   UseGuards,
 } from '@nestjs/common';
@@ -13,20 +12,13 @@ import { LocalAuthGuard } from './guards/local-auth.guard';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CreateUserDto } from 'src/users/dto/create-user.dto';
-import { Request, Response } from 'express';
+import { Request } from 'express';
 import { UserEntity } from 'src/users/entities/user.entity';
 import { plainToInstance } from 'class-transformer';
-import { Roles } from './decorators/role.decorator';
-import { UserRole } from 'src/users/enums/enums';
-import { RolesGuard } from './guards/roles.guard';
-import {
-  ApiBearerAuth,
-  ApiCookieAuth,
-  ApiOperation,
-  ApiResponse,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { AccessTokenEntity } from './entities/access-token.entity';
 import { LocalAuthDto } from './dto/local-auth.dto';
+import { LocalAuthEntity } from './entities/local-auth.entity';
 
 @Controller('auth')
 export class AuthController {
@@ -38,10 +30,10 @@ export class AuthController {
   @ApiResponse({
     status: 201,
     description: 'Login successful',
-    type: AccessTokenEntity,
+    type: LocalAuthEntity,
     example: {
-      accessToken:
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJfaWQiOiI1MzRjNTU4NC1lYWI0LTRhNWItYTE0OC1iYTFiZTkxOTg2MWMiLCJlbWFpbCI6ImNhbWVyb25sdWNhc0BzaXRlaXRzb2x1dGlvbnMuY29tIiwiaWF0IjoxNzM2MTIxMzk3LCJleHAiOjE3MzYxMjMxOTd9.wjRpe3BZvIXC9EcPuV5buTHkkwnGdPZCNTMi2BtKNko',
+      accessToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVC...',
+      refreshToken: 'eyJfaWQiOiI1MzRjNTU4NC1lYWI0LTRhN...',
     },
   })
   @ApiResponse({
@@ -56,24 +48,19 @@ export class AuthController {
   })
   async login(
     @Req() req: Request,
-    @Res({ passthrough: true }) res: Response,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     @Body() body: LocalAuthDto,
-  ): Promise<{ accessToken: string }> {
+  ): Promise<LocalAuthEntity> {
     const user = plainToInstance(UserEntity, req.user);
     const tokens = await this.authService.generateTokens({
       _id: user._id,
       email: user.email,
     });
 
-    res.cookie('refreshToken', tokens.refreshToken, {
-      httpOnly: true, // Prevent access by JavaScript
-      secure: process.env.NODE_ENV === 'production', // Only HTTPS in production
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    });
-
-    return { accessToken: tokens.accessToken };
+    return {
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+    };
   }
 
   @UseGuards(JwtAuthGuard)
@@ -90,10 +77,7 @@ export class AuthController {
     description: 'Unauthorized',
     example: new UnauthorizedException().getResponse(),
   })
-  async logout(
-    @Req() request: Request,
-    @Res({ passthrough: true }) response: Response,
-  ) {
+  async logout(@Req() request: Request) {
     const authHeader = request.headers.authorization;
     const accessToken = authHeader?.split(' ')[1]; // Extract access token
 
@@ -101,18 +85,10 @@ export class AuthController {
       await this.authService.invalidateAccessToken(accessToken); // Blacklist the access token
     }
 
-    // Clear the refresh token cookie
-    response.clearCookie('refreshToken', {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-    });
-
     return { message: 'Logged out successfully' };
   }
 
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(UserRole.USER)
+  @UseGuards(JwtAuthGuard)
   @Get('profile')
   @ApiOperation({ summary: 'Get user profile' })
   @ApiBearerAuth()
@@ -133,7 +109,7 @@ export class AuthController {
 
   @Post('refresh')
   @ApiOperation({ summary: 'Refresh access token' })
-  @ApiCookieAuth('refreshToken')
+  @ApiBearerAuth()
   @ApiResponse({
     status: 201,
     description: 'Access token refreshed successfully',
@@ -148,26 +124,29 @@ export class AuthController {
     description: 'Unauthorized',
     example: new UnauthorizedException().getResponse(),
   })
-  async refresh(
-    @Req() req: Request,
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    const refreshToken = req.cookies['refreshToken'];
+  async refresh(@Req() req: Request): Promise<{ accessToken: string }> {
+    const authHeader = req.headers['authorization'];
+    const refreshToken = authHeader?.startsWith('Bearer ')
+      ? authHeader.split(' ')[1]
+      : null;
+
     if (!refreshToken) {
       throw new UnauthorizedException('Refresh token not found');
+    }
+
+    // Check if the refresh token is blacklisted
+    const isBlacklisted =
+      await this.authService.isAccessTokenBlacklisted(refreshToken);
+    if (isBlacklisted) {
+      throw new UnauthorizedException(
+        'Refresh token has been invalidated. Please log in again.',
+      );
     }
 
     const payload = await this.authService.verifyRefreshToken(refreshToken);
     const tokens = await this.authService.generateTokens({
       _id: payload._id,
       email: payload.email,
-    });
-
-    res.cookie('refreshToken', tokens.refreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
     return { accessToken: tokens.accessToken };
