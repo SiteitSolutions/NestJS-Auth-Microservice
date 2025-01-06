@@ -35,12 +35,11 @@ export class AuthService {
   // Verify Refresh Token
   async verifyRefreshToken(
     token: string,
-  ): Promise<UserEntity & { iat: any; exp: any }> {
+  ): Promise<{ _id: string; email: string }> {
     try {
-      const payload = this.jwtService.verify(token, {
+      return this.jwtService.verify(token, {
         secret: process.env.REFRESH_TOKEN_SECRET,
       });
-      return payload;
     } catch {
       throw new UnauthorizedException('Invalid or expired refresh token');
     }

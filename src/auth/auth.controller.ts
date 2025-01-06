@@ -51,7 +51,11 @@ export class AuthController {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     @Body() body: LocalAuthDto,
   ): Promise<LocalAuthEntity> {
-    const tokens = await this.authService.generateTokens({ ...req.user });
+    const user = plainToInstance(UserEntity, req.user);
+    const tokens = await this.authService.generateTokens({
+      _id: user._id,
+      email: user.email,
+    });
 
     return {
       accessToken: tokens.accessToken,
@@ -140,11 +144,10 @@ export class AuthController {
     }
 
     const payload = await this.authService.verifyRefreshToken(refreshToken);
-
-    delete payload?.iat;
-    delete payload?.exp;
-
-    const tokens = await this.authService.generateTokens(payload);
+    const tokens = await this.authService.generateTokens({
+      _id: payload._id,
+      email: payload.email,
+    });
 
     return { accessToken: tokens.accessToken };
   }
