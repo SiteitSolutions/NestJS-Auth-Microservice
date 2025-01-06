@@ -2,7 +2,7 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Cache } from 'cache-manager';
-import { plainToClass, plainToInstance } from 'class-transformer';
+import { plainToInstance } from 'class-transformer';
 import { CreateUserDto } from 'src/users/dto/create-user.dto';
 import { UserEntity } from 'src/users/entities/user.entity';
 import { UsersService } from 'src/users/users.service';
@@ -35,7 +35,7 @@ export class AuthService {
   // Verify Refresh Token
   async verifyRefreshToken(
     token: string,
-  ): Promise<{ _id: string; email: string }> {
+  ): Promise<UserEntity & { iat: any; exp: any }> {
     try {
       const payload = this.jwtService.verify(token, {
         secret: process.env.REFRESH_TOKEN_SECRET,
