@@ -1,99 +1,198 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Auth Microservice API
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+An **open-source authentication and authorization microservice API** built with **NestJS** and **PassportJS**. This API provides robust user authentication, role-based access control (RBAC), and supports multiple authentication strategies.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://coveralls.io/github/nestjs/nest?branch=master" target="_blank"><img src="https://coveralls.io/repos/github/nestjs/nest/badge.svg?branch=master#9" alt="Coverage" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+---
 
-## Description
+## **Table of Contents**
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+1. [Features](#features)
+2. [Technologies](#technologies)
+3. [Getting Started](#getting-started)
+4. [Environment Variables](#environment-variables)
+5. [Endpoints Overview](#endpoints-overview)
+6. [Usage Examples](#usage-examples)
+7. [Swagger Documentation](#swagger-documentation)
+8. [RBAC (Role-Based Access Control)](#rbac-role-based-access-control)
+9. [Contributing](#contributing)
+10. [License](#license)
 
-## Project setup
+---
+
+## **Features**
+
+- **Local authentication** with email and password.
+- **JWT-based access and refresh tokens** for session management.
+- **Token blacklisting** for invalidating compromised tokens.
+- **Role-Based Access Control (RBAC)** for managing user permissions.
+- **Integration-ready** for social logins like Google, Facebook, GitHub (extensible).
+- **MongoDB** for data storage.
+- **Redis** for caching and token invalidation.
+- Comprehensive **Swagger API documentation**.
+
+---
+
+## **Technologies**
+
+- **NestJS**: Backend framework.
+- **PassportJS**: Authentication middleware.
+- **JWT (JSON Web Tokens)**: Secure access and refresh tokens.
+- **MongoDB**: Database.
+- **Redis**: Cache storage for token management.
+- **Swagger**: API documentation.
+
+---
+
+## **Getting Started**
+
+### **1. Prerequisites**
+
+- [Node.js](https://nodejs.org/) v18+
+- [Docker](https://www.docker.com/)
+- [Docker Compose](https://docs.docker.com/compose/)
+
+### **2. Clone the Repository**
+
+```bash
+$ git clone https://github.com/your-repository/auth-microservice.git
+$ cd auth-microservice
+```
+
+### **3. Install Dependencies**
 
 ```bash
 $ npm install
 ```
 
-## Compile and run the project
+### **4. Run the Application (Development Mode)**
 
 ```bash
-# development
-$ npm run start
-
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+$ docker compose up -d --build
 ```
 
-## Run tests
+This will build and start the App, MongoDB, and Redis.
 
-```bash
-# unit tests
-$ npm run test
+---
 
-# e2e tests
-$ npm run test:e2e
+## **Environment Variables**
 
-# test coverage
-$ npm run test:cov
+Create a `.env` file in the project root and configure the following variables:
+
+```env
+#Database URI
+MONGO_URI="mongodb://root:password@localhost:27017/nestdb?authSource=admin"
+
+#Redis Configuration
+REDIS_HOST="localhost"
+REDIS_PORT="6379"
+REDIS_TTL="900_000" # 15 minutes
+
+#JWT Configuration
+JWT_SECRET="ZgcI4otHHeQAC1Pf4Ijsb/hcluGoCe13WcK8LHiBFCUkpyekQYQFijKVgbvJud7LvZFPw4Be3X/TSTjjPaNiUObCC0hWGgke"
+REFRESH_TOKEN_SECRET="XcziglfyenMyDS66VTb3qXzH2YSpsC/x7YABh4UVYeyrGpvJlwf3mERCEw2N5DM+5WvFoLMEiHkRNCcD5lNJpRdChTBENWkz"
 ```
 
-## Deployment
+## **Usage Examples**
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+### **Login**
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+**Request:**
 
-```bash
-$ npm install -g mau
-$ mau deploy
+```http
+POST /auth/login
+Content-Type: application/json
+
+{
+  "email": "john.doe@example.com",
+  "password": "StrongPassword123!"
+}
 ```
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+**Response:**
 
-## Resources
+```json
+{
+  "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+}
+```
 
-Check out a few resources that may come in handy when working with NestJS:
+### **Refresh Token**
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+**Request:**
 
-## Support
+```http
+POST /auth/refresh
+Cookie: refreshToken=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+```
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+**Response:**
 
-## Stay in touch
+```json
+{
+  "accessToken": "newAccessTokenString..."
+}
+```
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+### **Logout**
 
-## License
+**Request:**
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+```http
+POST /auth/logout
+Authorization: Bearer accessToken
+```
+
+**Response:**
+
+```json
+{
+  "message": "Logged out successfully"
+}
+```
+
+---
+
+## **Swagger Documentation**
+
+- Swagger UI is available at `http://localhost:3000/api`.
+- Endpoints include detailed request and response schemas.
+
+To view or test endpoints.
+
+---
+
+## **RBAC (Role-Based Access Control)**
+
+- Roles available: `ADMIN`, `MODERATOR`, `USER`.
+- Use the `@Roles()` decorator in your controller to restrict routes:
+
+**Example:**
+
+```typescript
+@Patch(':id')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(UserRole.ADMIN)
+async updateUser(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
+  return this.usersService.updateUser(id, updateUserDto);
+}
+```
+
+---
+
+## **Contributing**
+
+1. Fork the repository.
+2. Create your feature branch (`git checkout -b feature/your-feature`).
+3. Commit your changes (`git commit -m 'Add feature'`).
+4. Push to the branch (`git push origin feature/your-feature`).
+5. Open a pull request.
+
+---
+
+## **License**
+
+This project is licensed under the MIT License. See `LICENSE` for more details.
+
+---
+
+Feel free to open issues or contribute by submitting pull requests!
