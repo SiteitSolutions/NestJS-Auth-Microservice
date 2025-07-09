@@ -48,11 +48,35 @@ export class AuthService {
   async validateUser(email: string, pass: string): Promise<UserEntity | null> {
     const userDocument = await this.usersService.findOne({ email });
 
-    if (userDocument && userDocument.comparePassword(pass)) {
-      return plainToInstance(UserEntity, userDocument.toObject());
+    if (!userDocument) {
+      return null;
     }
 
-    return null;
+    // Check if account is locked
+    if (userDocument.isLocked && userDocument.isLocked()) {
+      throw new UnauthorizedException(
+        'Account is temporarily locked due to too many failed login attempts. Please try again later.',
+      );
+    }
+
+    // Check if password is correct
+    const isPasswordValid = userDocument.comparePassword(pass);
+
+    if (!isPasswordValid) {
+      // Increment login attempts
+      await userDocument.incLoginAttempts();
+      return null;
+    }
+
+    // Reset login attempts on successful login
+    await userDocument.resetLoginAttempts();
+
+    // Check if account is active
+    if (!userDocument.isActive) {
+      throw new UnauthorizedException('Account is deactivated');
+    }
+
+    return plainToInstance(UserEntity, userDocument.toObject());
   }
 
   async validateJwt(payload: any): Promise<UserEntity | null> {

@@ -19,6 +19,7 @@ import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { AccessTokenEntity } from './entities/access-token.entity';
 import { LocalAuthDto } from './dto/local-auth.dto';
 import { LocalAuthEntity } from './entities/local-auth.entity';
+import { Throttle } from '@nestjs/throttler';
 
 @Controller('auth')
 export class AuthController {
@@ -26,6 +27,7 @@ export class AuthController {
 
   @UseGuards(LocalAuthGuard)
   @Post('login')
+  @Throttle({ default: { limit: 3, ttl: 60000 } }) // 3 attempts per minute
   @ApiOperation({ summary: 'Login with email and password' })
   @ApiResponse({
     status: 201,
@@ -153,6 +155,7 @@ export class AuthController {
   }
 
   @Post('register')
+  @Throttle({ default: { limit: 5, ttl: 60000 } }) // 5 registrations per minute
   @ApiOperation({ summary: 'Register a new user' })
   @ApiResponse({
     status: 201,

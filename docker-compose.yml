@@ -4,40 +4,52 @@ services:
   app:
     build:
       context: .
-      dockerfile: Dockerfile  # Path to your Dockerfile
+      dockerfile: Dockerfile # Path to your Dockerfile
     container_name: nestjs-app
     ports:
-      - "3000:3000"  # Expose port 3000 for the app
+      - '3000:3000' # Expose port 3000 for the app
     environment:
-      MONGO_URI: mongodb://root:password@mongodb:27017/nestdb?authSource=admin  # MongoDB connection string
+      MONGO_URI: mongodb://root:password@mongodb:27017/nestdb?authSource=admin # MongoDB connection string
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      REDIS_TTL: 900_000  # 15 minutes in milliseconds
-      JWT_SECRET: "ZgcI4otHHeQAC1Pf4Ijsb/hcluGoCe13WcK8LHiBFCUkpyekQYQFijKVgbvJud7LvZFPw4Be3X/TSTjjPaNiUObCC0hWGgke"
-      REFRESH_TOKEN_SECRET: "XcziglfyenMyDS66VTb3qXzH2YSpsC/x7YABh4UVYeyrGpvJlwf3mERCEw2N5DM+5WvFoLMEiHkRNCcD5lNJpRdChTBENWkz"
+      REDIS_TTL: 900000 # 15 minutes in milliseconds
+      NODE_ENV: development
+      # IMPORTANT: Change these secrets in production!
+      JWT_SECRET: 'CHANGE_THIS_IN_PRODUCTION_USE_ENV_FILE'
+      REFRESH_TOKEN_SECRET: 'CHANGE_THIS_IN_PRODUCTION_USE_ENV_FILE'
+      # Rate limiting
+      RATE_LIMIT_TTL: 60000
+      RATE_LIMIT_MAX: 100
+      AUTH_RATE_LIMIT_MAX: 5
+      # Security
+      MAX_LOGIN_ATTEMPTS: 5
+      LOCKOUT_TIME: 900000
+      BCRYPT_ROUNDS: 12
+      # CORS
+      ALLOWED_ORIGINS: 'http://localhost:3000,http://localhost:3001'
     depends_on:
-      - mongodb  # Ensures MongoDB starts before the app service
-      - redis  # Ensures Redis starts before the app service
+      - mongodb # Ensures MongoDB starts before the app service
+      - redis # Ensures Redis starts before the app service
 
   mongodb:
     image: mongo:6.0 # MongoDB image
     container_name: nestjs-mongodb
     ports:
-      - "27017:27017"  # MongoDB port
+      - '27017:27017' # MongoDB port
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: password
       MONGO_INITDB_DATABASE: nestdb
     volumes:
-      - mongo-data:/data/db  # Persistent storage for MongoDB data
+      - mongo-data:/data/db # Persistent storage for MongoDB data
       - mongo-config:/data/configdb
-  
+
   redis:
     image: redis:latest
     container_name: nestjs-redis
     ports:
-      - "6379:6379"  # Expose Redis default port
-    command: ["redis-server", "--save", "", "--appendonly", "no"]  # Disable persistence for dev
+      - '6379:6379' # Expose Redis default port
+    command: ['redis-server', '--save', '', '--appendonly', 'no'] # Disable persistence for dev
     volumes:
       - redis-data:/data
 
