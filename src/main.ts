@@ -26,8 +26,8 @@ async function bootstrap() {
   app.useGlobalPipes(
     new ValidationPipe({
       transform: true,
-      // whitelist: true, // Strip unknown properties
-      // forbidNonWhitelisted: true, // Throw error for unknown properties
+      whitelist: true, // Strip unknown properties
+      forbidNonWhitelisted: true, // Throw error for unknown properties
       disableErrorMessages: process.env.NODE_ENV === 'production', // Hide validation details in production
     }),
   );
