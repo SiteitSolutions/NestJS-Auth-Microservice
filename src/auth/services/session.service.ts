@@ -151,4 +151,46 @@ export class SessionService {
       return { deviceName: 'Desktop', deviceType: 'desktop' };
     }
   }
+
+  async updateSessionRefreshToken(
+    sessionId: string,
+    refreshToken: string,
+  ): Promise<void> {
+    await this.sessionModel.updateOne(
+      { _id: sessionId },
+      { $set: { refreshToken } },
+    );
+  }
+
+  async findCurrentUserSession(
+    userId: string,
+    refreshToken: string,
+  ): Promise<SessionDocument | null> {
+    return this.sessionModel.findOne({
+      userId,
+      refreshToken,
+      isActive: true,
+      expiresAt: { $gt: new Date() },
+      revokedAt: null,
+    });
+  }
+
+  async isSessionValid(sessionId: string): Promise<boolean> {
+    const session = await this.sessionModel.findOne({
+      _id: sessionId,
+      isActive: true,
+      expiresAt: { $gt: new Date() },
+      revokedAt: null,
+    });
+    return !!session;
+  }
+
+  async findSessionById(sessionId: string): Promise<SessionDocument | null> {
+    return this.sessionModel.findOne({
+      _id: sessionId,
+      isActive: true,
+      expiresAt: { $gt: new Date() },
+      revokedAt: null,
+    });
+  }
 }

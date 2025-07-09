@@ -8,6 +8,12 @@ import { UserEntity } from 'src/users/entities/user.entity';
 import { UsersService } from 'src/users/users.service';
 import { SessionService } from './services/session.service';
 import { LoggingService } from 'src/common/services/logging.service';
+import {
+  JwtPayload,
+  RefreshTokenPayload,
+  DeviceInfo,
+  TokenResponse,
+} from './interfaces/auth.interface';
 
 @Injectable()
 export class AuthService {
@@ -21,31 +27,22 @@ export class AuthService {
 
   // Generate Access and Refresh Tokens with Session Management
   async generateTokensWithSession(
-    payload: any,
-    deviceInfo: {
-      userAgent?: string;
-      ipAddress?: string;
-      deviceId?: string;
-      deviceName?: string;
-    },
-  ): Promise<{ accessToken: string; refreshToken: string; sessionId: string }> {
-    const accessToken = this.jwtService.sign(payload, {
-      secret: process.env.JWT_SECRET,
-      expiresIn: '30m', // Short-lived access token (30 minutes)
-    });
-
-    const refreshToken = this.jwtService.sign(
-      { ...payload, sessionId: payload.sessionId },
+    payload: JwtPayload,
+    deviceInfo: DeviceInfo,
+  ): Promise<TokenResponse> {
+    // Generate a temporary refresh token to create the session
+    const tempRefreshToken = this.jwtService.sign(
+      {},
       {
         secret: process.env.REFRESH_TOKEN_SECRET,
         expiresIn: '7d', // Long-lived refresh token (7 days)
       },
     );
 
-    // Create session
-    const session = await this.sessionService.createSession({
+    // Create session first to get sessionId
+    const tempSession = await this.sessionService.createSession({
       userId: payload._id,
-      refreshToken,
+      refreshToken: tempRefreshToken, // Will be updated after token generation
       deviceId: deviceInfo.deviceId,
       deviceName: deviceInfo.deviceName,
       userAgent: deviceInfo.userAgent,
@@ -53,12 +50,45 @@ export class AuthService {
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
     });
 
-    return { accessToken, refreshToken, sessionId: session._id };
+    const sessionId = tempSession._id.toString();
+
+    // Include sessionId in access token for better session tracking
+    const accessTokenPayload: JwtPayload = {
+      ...payload,
+      sessionId,
+    };
+
+    const accessToken = this.jwtService.sign(accessTokenPayload, {
+      secret: process.env.JWT_SECRET,
+      expiresIn: '30m', // Short-lived access token (30 minutes)
+    });
+
+    const refreshTokenPayload: RefreshTokenPayload = {
+      ...payload,
+      sessionId,
+    };
+
+    const refreshToken = this.jwtService.sign(refreshTokenPayload, {
+      secret: process.env.REFRESH_TOKEN_SECRET,
+      expiresIn: '7d', // Long-lived refresh token (7 days)
+    });
+
+    // Update session with the refresh token
+    await this.sessionService.updateSessionRefreshToken(
+      sessionId,
+      refreshToken,
+    );
+
+    return {
+      accessToken,
+      refreshToken,
+      sessionId,
+    };
   }
 
   // Legacy method for backward compatibility
   async generateTokens(
-    payload: any,
+    payload: JwtPayload,
   ): Promise<{ accessToken: string; refreshToken: string }> {
     const result = await this.generateTokensWithSession(payload, {});
     return {
@@ -68,9 +98,7 @@ export class AuthService {
   }
 
   // Verify Refresh Token
-  async verifyRefreshToken(
-    token: string,
-  ): Promise<{ _id: string; email: string }> {
+  async verifyRefreshToken(token: string): Promise<RefreshTokenPayload> {
     try {
       return this.jwtService.verify(token, {
         secret: process.env.REFRESH_TOKEN_SECRET,
@@ -169,7 +197,7 @@ export class AuthService {
 
     // Generate new tokens
     const newAccessToken = this.jwtService.sign(
-      { _id: payload._id, email: payload.email },
+      { _id: payload._id, email: payload.email, sessionId: session._id },
       {
         secret: process.env.JWT_SECRET,
         expiresIn: '30m',
@@ -226,5 +254,13 @@ export class AuthService {
       currentRefreshToken,
     );
     this.loggingService.info('Other user sessions revoked', { userId });
+  }
+
+  async updateSessionLastUsed(sessionId: string): Promise<void> {
+    await this.sessionService.updateSessionLastUsed(sessionId);
+  }
+
+  async validateSession(sessionId: string): Promise<boolean> {
+    return this.sessionService.isSessionValid(sessionId);
   }
 }

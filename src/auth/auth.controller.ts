@@ -19,12 +19,17 @@ import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { AccessTokenEntity } from './entities/access-token.entity';
 import { LocalAuthDto } from './dto/local-auth.dto';
 import { LocalAuthEntity } from './entities/local-auth.entity';
+import { JwtService } from '@nestjs/jwt';
 import { Throttle } from '@nestjs/throttler';
 import { RevokeSessionDto, SessionResponseDto } from './dto/session.dto';
+import { JwtPayload, DeviceInfo } from './interfaces/auth.interface';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(
+    private authService: AuthService,
+    private jwtService: JwtService,
+  ) {}
 
   @UseGuards(LocalAuthGuard)
   @Post('login')
@@ -56,24 +61,29 @@ export class AuthController {
   ): Promise<LocalAuthEntity> {
     const user = plainToInstance(UserEntity, req.user);
 
+    // Prepare JWT payload
+    const jwtPayload: JwtPayload = {
+      _id: user._id,
+      email: user.email,
+    };
+
     // Get device information
     const userAgent = req.get('User-Agent');
     const ipAddress = req.ip || req.connection.remoteAddress;
     const deviceId = req.get('X-Device-ID'); // Optional header for device tracking
 
+    const deviceInfo: DeviceInfo = {
+      userAgent,
+      ipAddress,
+      deviceId,
+      deviceName: userAgent
+        ? await this.getDeviceName(userAgent)
+        : 'Unknown Device',
+    };
+
     const tokens = await this.authService.generateTokensWithSession(
-      {
-        _id: user._id,
-        email: user.email,
-      },
-      {
-        userAgent,
-        ipAddress,
-        deviceId,
-        deviceName: userAgent
-          ? await this.getDeviceName(userAgent)
-          : 'Unknown Device',
-      },
+      jwtPayload,
+      deviceInfo,
     );
 
     return {
@@ -253,14 +263,47 @@ export class AuthController {
   async logoutOthers(@Req() req: Request) {
     const user = plainToInstance(UserEntity, req.user);
     const authHeader = req.headers['authorization'];
-    const currentToken = authHeader?.split(' ')[1];
+    const accessToken = authHeader?.split(' ')[1];
 
-    if (!currentToken) {
-      throw new UnauthorizedException('Current token not found');
+    if (!accessToken) {
+      throw new UnauthorizedException('Access token not found');
     }
 
-    // Find current session to preserve it
-    await this.authService.revokeOtherUserSessions(user._id, currentToken);
+    // Decode the access token to get sessionId (without verification for this purpose)
+    const decodedToken = this.jwtService.decode(accessToken) as any;
+    const currentSessionId = decodedToken?.sessionId;
+
+    if (currentSessionId) {
+      // Find current session by sessionId to get the refresh token
+      const sessions = await this.authService.getUserSessions(user._id);
+      const currentSession = sessions.find((s) => s._id === currentSessionId);
+
+      if (currentSession) {
+        await this.authService.revokeOtherUserSessions(
+          user._id,
+          currentSession.refreshToken,
+        );
+      } else {
+        // Fallback: revoke all sessions if current session not found
+        await this.authService.revokeAllUserSessions(user._id);
+      }
+    } else {
+      // Fallback for older tokens without sessionId: preserve most recent session
+      const sessions = await this.authService.getUserSessions(user._id);
+      const mostRecentSession = sessions.sort(
+        (a, b) =>
+          new Date(b.lastUsedAt).getTime() - new Date(a.lastUsedAt).getTime(),
+      )[0];
+
+      if (mostRecentSession) {
+        await this.authService.revokeOtherUserSessions(
+          user._id,
+          mostRecentSession.refreshToken,
+        );
+      } else {
+        await this.authService.revokeAllUserSessions(user._id);
+      }
+    }
 
     return { message: 'Logged out from other devices successfully' };
   }
