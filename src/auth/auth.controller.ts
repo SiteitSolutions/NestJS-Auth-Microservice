@@ -19,13 +19,21 @@ import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { AccessTokenEntity } from './entities/access-token.entity';
 import { LocalAuthDto } from './dto/local-auth.dto';
 import { LocalAuthEntity } from './entities/local-auth.entity';
+import { JwtService } from '@nestjs/jwt';
+import { Throttle } from '@nestjs/throttler';
+import { RevokeSessionDto, SessionResponseDto } from './dto/session.dto';
+import { JwtPayload, DeviceInfo } from './interfaces/auth.interface';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(
+    private authService: AuthService,
+    private jwtService: JwtService,
+  ) {}
 
   @UseGuards(LocalAuthGuard)
   @Post('login')
+  @Throttle({ default: { limit: 3, ttl: 60000 } }) // 3 attempts per minute
   @ApiOperation({ summary: 'Login with email and password' })
   @ApiResponse({
     status: 201,
@@ -52,15 +60,51 @@ export class AuthController {
     @Body() body: LocalAuthDto,
   ): Promise<LocalAuthEntity> {
     const user = plainToInstance(UserEntity, req.user);
-    const tokens = await this.authService.generateTokens({
+
+    // Prepare JWT payload
+    const jwtPayload: JwtPayload = {
       _id: user._id,
       email: user.email,
-    });
+    };
+
+    // Get device information
+    const userAgent = req.get('User-Agent');
+    const ipAddress = req.ip || req.connection.remoteAddress;
+    const deviceId = req.get('X-Device-ID'); // Optional header for device tracking
+
+    const deviceInfo: DeviceInfo = {
+      userAgent,
+      ipAddress,
+      deviceId,
+      deviceName: userAgent
+        ? await this.getDeviceName(userAgent)
+        : 'Unknown Device',
+    };
+
+    const tokens = await this.authService.generateTokensWithSession(
+      jwtPayload,
+      deviceInfo,
+    );
 
     return {
       accessToken: tokens.accessToken,
       refreshToken: tokens.refreshToken,
     };
+  }
+
+  private async getDeviceName(userAgent: string): Promise<string> {
+    // Simple device detection - can be enhanced with a library like ua-parser-js
+    if (
+      userAgent.includes('Mobile') ||
+      userAgent.includes('Android') ||
+      userAgent.includes('iPhone')
+    ) {
+      return 'Mobile Device';
+    } else if (userAgent.includes('Tablet') || userAgent.includes('iPad')) {
+      return 'Tablet';
+    } else {
+      return 'Desktop';
+    }
   }
 
   @UseGuards(JwtAuthGuard)
@@ -124,7 +168,9 @@ export class AuthController {
     description: 'Unauthorized',
     example: new UnauthorizedException().getResponse(),
   })
-  async refresh(@Req() req: Request): Promise<{ accessToken: string }> {
+  async refresh(
+    @Req() req: Request,
+  ): Promise<{ accessToken: string; refreshToken: string }> {
     const authHeader = req.headers['authorization'];
     const refreshToken = authHeader?.startsWith('Bearer ')
       ? authHeader.split(' ')[1]
@@ -134,25 +180,23 @@ export class AuthController {
       throw new UnauthorizedException('Refresh token not found');
     }
 
-    // Check if the refresh token is blacklisted
-    const isBlacklisted =
-      await this.authService.isAccessTokenBlacklisted(refreshToken);
-    if (isBlacklisted) {
-      throw new UnauthorizedException(
-        'Refresh token has been invalidated. Please log in again.',
-      );
-    }
+    // Use refresh token rotation for enhanced security
+    const tokens = await this.authService.refreshTokenWithRotation(
+      refreshToken,
+      {
+        userAgent: req.get('User-Agent'),
+        ipAddress: req.ip || req.connection.remoteAddress,
+      },
+    );
 
-    const payload = await this.authService.verifyRefreshToken(refreshToken);
-    const tokens = await this.authService.generateTokens({
-      _id: payload._id,
-      email: payload.email,
-    });
-
-    return { accessToken: tokens.accessToken };
+    return {
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+    };
   }
 
   @Post('register')
+  @Throttle({ default: { limit: 5, ttl: 60000 } }) // 5 registrations per minute
   @ApiOperation({ summary: 'Register a new user' })
   @ApiResponse({
     status: 201,
@@ -166,5 +210,123 @@ export class AuthController {
   })
   async register(@Body() body: CreateUserDto): Promise<UserEntity | null> {
     return this.authService.register(body);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('sessions')
+  @ApiOperation({ summary: 'Get user active sessions' })
+  @ApiBearerAuth()
+  @ApiResponse({
+    status: 200,
+    description: 'User sessions retrieved successfully',
+    type: [SessionResponseDto],
+  })
+  async getUserSessions(@Req() req: Request): Promise<SessionResponseDto[]> {
+    const user = plainToInstance(UserEntity, req.user);
+    const sessions = await this.authService.getUserSessions(user._id);
+
+    // Don't expose full refresh tokens, just metadata
+    return sessions.map((session) => ({
+      id: session._id,
+      deviceName: session.deviceName,
+      deviceId: session.deviceId,
+      userAgent: session.userAgent,
+      ipAddress: session.ipAddress,
+      location: session.location,
+      lastUsedAt: session.lastUsedAt,
+      expiresAt: session.expiresAt,
+    }));
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('logout-all')
+  @ApiOperation({ summary: 'Logout from all devices' })
+  @ApiBearerAuth()
+  @ApiResponse({
+    status: 201,
+    description: 'Logged out from all devices successfully',
+  })
+  async logoutAll(@Req() req: Request) {
+    const user = plainToInstance(UserEntity, req.user);
+    await this.authService.revokeAllUserSessions(user._id);
+    return { message: 'Logged out from all devices successfully' };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('logout-others')
+  @ApiOperation({ summary: 'Logout from all other devices' })
+  @ApiBearerAuth()
+  @ApiResponse({
+    status: 201,
+    description: 'Logged out from other devices successfully',
+  })
+  async logoutOthers(@Req() req: Request) {
+    const user = plainToInstance(UserEntity, req.user);
+    const authHeader = req.headers['authorization'];
+    const accessToken = authHeader?.split(' ')[1];
+
+    if (!accessToken) {
+      throw new UnauthorizedException('Access token not found');
+    }
+
+    // Decode the access token to get sessionId (without verification for this purpose)
+    const decodedToken = this.jwtService.decode(accessToken) as any;
+    const currentSessionId = decodedToken?.sessionId;
+
+    if (currentSessionId) {
+      // Find current session by sessionId to get the refresh token
+      const sessions = await this.authService.getUserSessions(user._id);
+      const currentSession = sessions.find((s) => s._id === currentSessionId);
+
+      if (currentSession) {
+        await this.authService.revokeOtherUserSessions(
+          user._id,
+          currentSession.refreshToken,
+        );
+      } else {
+        // Fallback: revoke all sessions if current session not found
+        await this.authService.revokeAllUserSessions(user._id);
+      }
+    } else {
+      // Fallback for older tokens without sessionId: preserve most recent session
+      const sessions = await this.authService.getUserSessions(user._id);
+      const mostRecentSession = sessions.sort(
+        (a, b) =>
+          new Date(b.lastUsedAt).getTime() - new Date(a.lastUsedAt).getTime(),
+      )[0];
+
+      if (mostRecentSession) {
+        await this.authService.revokeOtherUserSessions(
+          user._id,
+          mostRecentSession.refreshToken,
+        );
+      } else {
+        await this.authService.revokeAllUserSessions(user._id);
+      }
+    }
+
+    return { message: 'Logged out from other devices successfully' };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('revoke-session')
+  @ApiOperation({ summary: 'Revoke a specific session' })
+  @ApiBearerAuth()
+  @ApiResponse({
+    status: 201,
+    description: 'Session revoked successfully',
+  })
+  async revokeSession(@Req() req: Request, @Body() body: RevokeSessionDto) {
+    const user = plainToInstance(UserEntity, req.user);
+    const sessions = await this.authService.getUserSessions(user._id);
+
+    // Find the session to revoke
+    const sessionToRevoke = sessions.find((s) => s._id === body.sessionId);
+    if (!sessionToRevoke) {
+      throw new UnauthorizedException('Session not found');
+    }
+
+    await this.authService.revokeSession(sessionToRevoke.refreshToken);
+    return { message: 'Session revoked successfully' };
   }
 }
