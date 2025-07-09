@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, NestModule, MiddlewareConsumer } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ConfigModule } from '@nestjs/config';
@@ -8,10 +8,14 @@ import { AuthModule } from './auth/auth.module';
 import { CacheModule, CacheStore } from '@nestjs/cache-manager';
 import { redisStore } from 'cache-manager-redis-yet';
 import { JwtModule } from '@nestjs/jwt';
+import { RequestLoggingMiddleware } from './common/services/logging.service';
+import { ScheduleModule } from '@nestjs/schedule';
+import { SessionCleanupService } from './tasks/session-cleanup.service';
 
 @Module({
   imports: [
     ConfigModule.forRoot(),
+    ScheduleModule.forRoot(),
     MongooseModule.forRoot(process.env.MONGO_URI),
     CacheModule.registerAsync({
       useFactory: async () => {
@@ -34,6 +38,10 @@ import { JwtModule } from '@nestjs/jwt';
     AuthModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, SessionCleanupService],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(RequestLoggingMiddleware).forRoutes('*');
+  }
+}

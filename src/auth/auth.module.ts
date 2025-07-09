@@ -7,11 +7,16 @@ import { AuthController } from './auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { APP_GUARD } from '@nestjs/core';
+import { MongooseModule } from '@nestjs/mongoose';
+import { Session, SessionSchema } from './schemas/session.schema';
+import { SessionService } from './services/session.service';
+import { LoggingService } from 'src/common/services/logging.service';
 
 @Module({
   imports: [
     UsersModule,
     PassportModule,
+    MongooseModule.forFeature([{ name: Session.name, schema: SessionSchema }]),
     ThrottlerModule.forRoot([
       {
         name: 'auth',
@@ -22,6 +27,8 @@ import { APP_GUARD } from '@nestjs/core';
   ],
   providers: [
     AuthService,
+    SessionService,
+    LoggingService,
     LocalStrategy,
     JwtStrategy,
     {
@@ -30,6 +37,6 @@ import { APP_GUARD } from '@nestjs/core';
     },
   ],
   controllers: [AuthController],
-  exports: [AuthService],
+  exports: [AuthService, SessionService, LoggingService],
 })
 export class AuthModule {}
